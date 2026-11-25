@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Karácsonyi Ajándékvadászat</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Alapbeállítások és mobil érintés védelem */
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+        }
+        
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #0b132b;
+            font-family: 'Fredoka', sans-serif;
+            touch-action: none; /* Megakadályozza a görgetést és nagyítást mobilon */
+        }
+
+        #gameCanvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Egyedi ünnepi gomb stílusok */
+        .festive-btn {
+            background: linear-gradient(180deg, #ef4444 0%, #b91c1c 100%);
+            border: 3px solid #fca5a5;
+            box-shadow: 0 6px 0 #7f1d1d, 0 12px 20px rgba(0, 0, 0, 0.4);
+            transition: transform 0.1s ease, box-shadow 0.1s ease;
+        }
+
+        .festive-btn:active {
+            transform: translateY(4px);
+            box-shadow: 0 2px 0 #7f1d1d, 0 4px 10px rgba(0, 0, 0, 0.4);
+        }
+
+        .gold-btn {
+            background: linear-gradient(180deg, #fbbf24 0%, #d97706 100%);
+            border: 3px solid #fef08a;
+            box-shadow: 0 6px 0 #92400e, 0 12px 20px rgba(0, 0, 0, 0.4);
+        }
+
+        .gold-btn:active {
+            transform: translateY(4px);
+            box-shadow: 0 2px 0 #92400e, 0 4px 10px rgba(0, 0, 0, 0.4);
+        }
+
+        /* Lebegő animáció a címhez */
+        @keyframes float {
+            0%, 100% { transform: translateY(0px) rotate(-1deg); }
+            50% { transform: translateY(-8px) rotate(1deg); }
+        }
+        .animate-float {
+            animation: float 3s ease-in-out infinite;
+        }
+
+        /* Pulzáló effekt a dupla pontszorzóhoz */
+        @keyframes pulseGlow {
+            0%, 100% { transform: scale(1); filter: drop-shadow(0 0 8px rgba(250, 204, 21, 0.8)); }
+            50% { transform: scale(1.08); filter: drop-shadow(0 0 16px rgba(250, 204, 21, 1)); }
+        }
+        .double-points-active {
+            animation: pulseGlow 0.8s infinite;
+        }
+
+        /* Üveghatású kártyák */
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.82);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 2px solid rgba(255, 255, 255, 0.15);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+        }
+    </style>
+</head>
+<body class="relative w-full h-full">
+
+    <!-- Játék Canvas -->
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- Játék közbeni HUD (Felső sáv) -->
+    <div id="hud" class="hidden absolute top-0 left-0 w-full p-3 sm:p-4 flex justify-between items-start pointer-events-none z-10">
+        <!-- Bal oldal: Pontszám és Kombó -->
+        <div class="flex flex-col gap-1.5">
+            <div class="glass-panel rounded-2xl px-4 py-2 flex items-center gap-2">
+                <span class="text-2xl">🎁</span>
+                <div>
+                    <div class="text-xs text-slate-300 uppercase tracking-wider font-semibold">Pontszám</div>
+                    <div id="scoreDisplay" class="text-2xl sm:text-3xl font-bold text-white leading-none">0</div>
+                </div>
+            </div>
+            
+            <!-- Kombó és Dupla Pont jelzők -->
+            <div class="flex flex-wrap gap-1.5">
+                <div id="comboBadge" class="hidden bg-emerald-600/90 border border-emerald-300 text-white text-xs sm:text-sm font-bold px-3 py-1 rounded-full shadow-lg">
+                    🔥 <span id="comboCount">2</span>x Kombó!
+                </div>
+                <div id="doubleBadge" class="hidden bg-amber-500/95 border border-yellow-200 text-slate-900 text-xs sm:text-sm font-bold px-3 py-1 rounded-full shadow-lg double-points-active">
+                    ⭐ 2x PONT (<span id="doubleTimer">5</span>s)
+                </div>
+            </div>
+        </div>
+
+        <!-- Jobb oldal: Életek és Vezérlőgombok -->
+        <div class="flex flex-col items-end gap-2">
+            <div class="flex items-center gap-2 pointer-events-auto">
+                <!-- Némítás gomb -->
+                <button id="muteBtn" class="glass-panel w-11 h-11 rounded-full flex items-center justify-center text-xl text-white active:scale-90 transition" aria-label="Hang ki/be">
+                    🔊
+                </button>
+                <!-- Szünet gomb -->
+                <button id="pauseBtn" class="glass-panel w-11 h-11 rounded-full flex items-center justify-center text-xl text-white active:scale-90 transition" aria-label="Szünet">
+                    ⏸️
+                </button>
+            </div>
+            
+            <!-- Életek (Szívecskék) -->
+            <div id="livesDisplay" class="glass-panel rounded-full px-3 py-1.5 flex gap-1 text-lg sm:text-xl shadow-md">
+                <span>❤️</span><span>❤️</span><span>❤️</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Kezdőképernyő (Start Screen) -->
+    <div id="startScreen" class="absolute inset-0 flex items-center justify-center p-4 z-20 bg-slate-950/40 backdrop-blur-[2px]">
+        <div class="glass-panel rounded-3xl p-6 sm:p-8 max-w-md w-full text-center flex flex-col items-center">
+            <div class="text-5xl mb-2 animate-float">🎅🛷</div>
+            <h1 class="text-3xl sm:text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-b from-white via-red-100 to-red-300 drop-shadow-sm mb-1">
+                Karácsonyi Ajándékvadászat
+            </h1>
+            <p class="text-slate-300 text-sm sm:text-base mb-5">Segíts a Mikulásnak összegyűjteni az ajándékokat!</p>
+
+            <!-- Rekord kijelzése -->
+            <div class="bg-slate-800/80 border border-amber-400/40 rounded-2xl px-5 py-2 mb-5 flex items-center gap-2">
+                <span class="text-xl">🏆</span>
+                <span class="text-slate-300 text-sm font-semibold">Rekord:</span>
+                <span id="startHighScore" class="text-amber-400 font-bold text-lg">0</span>
+            </div>
+
+            <!-- Játékszabályok ikonokkal -->
+            <div class="w-full bg-slate-900/60 rounded-2xl p-4 mb-6 text-left space-y-2.5 border border-slate-700/60 text-sm sm:text-base">
+                <div class="flex items-center gap-3">
+                    <span class="text-2xl w-8 text-center">🎁</span>
+                    <span class="text-slate-200"><strong class="text-emerald-400">+10 / +20 pont:</strong> Ajándékdobozok elkapása</span>
+                </div>
+                <div class="flex items-center gap-3">
+                    <span class="text-2xl w-8 text-center">🌟</span>
+                    <span class="text-slate-200"><strong class="text-amber-400">+50 pont & 2x szorzó:</strong> Aranycsillag / Mézeskalács</span>
+                </div>
+                <div class="flex items-center gap-3">
+                    <span class="text-2xl w-8 text-center">🪨</span>
+                    <span class="text-slate-200"><strong class="text-rose-400">-1 élet:</strong> Kerüld el a széndarabokat és jégcsapokat!</span>
+                </div>
+                <div class="flex items-center gap-3 pt-1 border-t border-slate-700/60">
+                    <span class="text-2xl w-8 text-center">👆</span>
+                    <span class="text-slate-300 text-xs sm:text-sm">Húzd az ujjad a képernyőn, vagy érintsd meg a bal/jobb oldalt!</span>
+                </div>
+            </div>
+
+            <!-- Indítás gomb -->
+            <button id="startBtn" class="festive-btn w-full py-4 rounded-2xl text-white font-bold text-xl sm:text-2xl tracking-wide cursor-pointer">
+                Játék indítása 🎄
+            </button>
+        </div>
+    </div>
+
+    <!-- Szünet képernyő (Pause Overlay) -->
+    <div id="pauseScreen" class="hidden absolute inset-0 flex items-center justify-center p-4 z-30 bg-slate-950/60 backdrop-blur-sm">
+        <div class="glass-panel rounded-3xl p-6 sm:p-8 max-w-xs w-full text-center flex flex-col items-center gap-4">
+            <div class="text-4xl">⏸️</div>
+            <h2 class="text-2xl sm:text-3xl font-bold text-white">Szünet</h2>
+            <p class="text-slate-300 text-sm">A rénszarvasok pihennek egy kicsit.</p>
+            <button id="resumeBtn" class="festive-btn w-full py-3.5 rounded-2xl text-white font-bold text-lg cursor-pointer mt-2">
+                Folytatás ▶️
+            </button>
+            <button id="quitToMenuBtn" class="w-full py-3 rounded-2xl bg-slate-700/80 hover:bg-slate-600 text-slate-200 font-semibold text-base border border-slate-500 cursor-pointer">
+                Főmenü
+            </button>
+        </div>
+    </div>
+
+    <!-- Játék vége képernyő (Game Over Screen) -->
+    <div id="gameOverScreen" class="hidden absolute inset-0 flex items-center justify-center p-4 z-30 bg-slate-950/70 backdrop-blur-sm">
+        <div class="glass-panel rounded-3xl p-6 sm:p-8 max-w-sm w-full text-center flex flex-col items-center">
+            <div class="text-5xl mb-2">🎄✨</div>
+            <h2 class="text-3xl sm:text-4xl font-bold text-white mb-1">Játék vége!</h2>
+            
+            <!-- Új rekord jelvény -->
+            <div id="newRecordBadge" class="hidden bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-400 text-slate-950 font-extrabold text-sm px-4 py-1 rounded-full shadow-lg my-2 animate-bounce">
+                🎉 ÚJ REKORD! 🎉
+            </div>
+
+            <div class="w-full bg-slate-900/70 rounded-2xl p-4 my-4 border border-slate-700/60 space-y-3">
+                <div>
+                    <div class="text-xs text-slate-400 uppercase font-semibold">Elért pontszám</div>
+                    <div id="finalScore" class="text-4xl font-bold text-emerald-400">0</div>
+                </div>
+                <div class="border-t border-slate-700/60 pt-2 flex justify-between items-center px-2">
+                    <span class="text-slate-300 text-sm">Legjobb eredmény:</span>
+                    <span id="finalHighScore" class="text-amber-400 font-bold text-lg">0</span>
+                </div>
+            </div>
+
+            <button id="restartBtn" class="festive-btn w-full py-4 rounded-2xl text-white font-bold text-xl tracking-wide cursor-pointer">
+                Újra 🔄
+            </button>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * HANGSZINTETIZÁTOR (Web Audio API - külső fájlok nélkül)
+         */
+        class SoundManager {
+            constructor() {
+                this.ctx = null;
+                this.muted = false;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    this.ctx = new AudioContext();
+                }
+                if (this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            }
+
+            toggleMute() {
+                this.muted = !this.muted;
+                return this.muted;
+            }
+
+            // Ünnepi csilingelés ajándék elkapásakor
+            playCatch(combo = 1) {
+                if (this.muted || !this.ctx) return;
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+
+                // A kombó növekedésével emelkedik a hangmagasság
+                const baseFreq = 587.33 + Math.min(combo, 12) * 35; // D5-től felfelé
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(baseFreq, now);
+                osc.frequency.exponentialRampToValueAtTime(baseFreq * 1.5, now + 0.14);
+
+                gain.gain.setValueAtTime(0.22, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc.start(now);
+                osc.stop(now + 0.26);
+            }
+
+            // Varázslatos arpeggio bónusz tárgy elkapásakor
+            playBonus() {
+                if (this.muted || !this.ctx) return;
+                const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+                notes.forEach((freq, idx) => {
+                    const now = this.ctx.currentTime + idx * 0.065;
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(freq, now);
+
+                    gain.gain.setValueAtTime(0.22, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+
+                    osc.start(now);
+                    osc.stop(now + 0.31);
+                });
+            }
+
+            // Mély puffanás széndarab / jégcsap eltalálásakor
+            playHit() {
+                if (this.muted || !this.ctx) return;
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(150, now);
+                osc.frequency.exponentialRampToValueAtTime(42, now + 0.32);
+
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc.start(now);
+                osc.stop(now + 0.36);
+            }
+
+            // Játék vége dallam
+            playGameOver() {
+                if (this.muted || !this.ctx) return;
+                const notes = [392.00, 349.23, 329.63, 261.63]; // G4, F4, E4, C4
+                notes.forEach((freq, idx) => {
+                    const now = this.ctx.currentTime + idx * 0.18;
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(freq, now);
+
+                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+
+                    osc.start(now);
+                    osc.stop(now + 0.42);
+                });
+            }
+        }
+
+        /**
+         * FŐ JÁTÉK OSZTÁLY
+         */
+        class ChristmasGame {
+            constructor() {
+                this.canvas = document.getElementById('gameCanvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.sound = new SoundManager();
+
+                // DOM elemek
+                this.hud = document.getElementById('hud');
+                this.scoreDisplay = document.getElementById('scoreDisplay');
+                this.comboBadge = document.getElementById('comboBadge');
+                this.comboCount = document.getElementById('comboCount');
+                this.doubleBadge = document.getElementById('doubleBadge');
+                this.doubleTimer = document.getElementById('doubleTimer');
+                this.livesDisplay = document.getElementById('livesDisplay');
+
+                this.startScreen = document.getElementById('startScreen');
+                this.pauseScreen = document.getElementById('pauseScreen');
+                this.gameOverScreen = document.getElementById('gameOverScreen');
+                this.startHighScore = document.getElementById('startHighScore');
+                this.finalScore = document.getElementById('finalScore');
+                this.finalHighScore = document.getElementById('finalHighScore');
+                this.newRecordBadge = document.getElementById('newRecordBadge');
+
+                // Játékállapot
+                this.state = 'MENU'; // MENU, PLAYING, PAUSED, GAMEOVER
+                this.score = 0;
+                this.highScore = parseInt(localStorage.getItem('santaCatcherHighScore') || '0', 10);
+                this.lives = 3;
+                this.maxLives = 3;
+                this.combo = 0;
+                this.doublePointsTime = 0; // másodpercben
+                this.lastTime = 0;
+                this.spawnTimer = 0;
+                this.shakeTime = 0;
+
+                // Játékos (Mikulás szánja)
+                this.player = {
+                    x: 0,
+                    y: 0,
+                    width: 100,
+                    height: 60,
+                    targetX: null,
+                    speed: 650,
+                    tilt: 0
+                };
+
+                // Entitások és háttér elemek
+                this.items = [];
+                this.particles = [];
+                this.floatingTexts = [];
+                this.snowflakes = [];
+                this.stars = [];
+                this.trees = [];
+
+                // Irányítás állapotok
+                this.keys = { left: false, right: false };
+                this.touchControl = {
+                    active: false,
+                    mode: null, // 'drag' vagy 'tap'
+                    offsetX: 0,
+                    tapDir: 0
+                };
+
+                this.initEnvironment();
+                this.bindEvents();
+                this.updateHighScoreUI();
+            }
+
+            // Képernyő méretezés és háttér generálás
+            initEnvironment() {
+                this.resize();
+                window.addEventListener('resize', () => this.resize());
+
+                // Csillagok generálása
+                this.stars = Array.from({ length: 65 }, () => ({
+                    x: Math.random(),
+                    y: Math.random() * 0.65,
+                    size: Math.random() * 2.2 + 0.8,
+                    twinkleSpeed: Math.random() * 3 + 1.5,
+                    phase: Math.random() * Math.PI * 2
+                }));
+
+                // Hópelyhek generálása
+                this.snowflakes = Array.from({ length: 85 }, () => ({
+                    x: Math.random() * this.width,
+                    y: Math.random() * this.height,
+                    radius: Math.random() * 3.2 + 1.2,
+                    speedY: Math.random() * 55 + 25,
+                    drift: Math.random() * 30 - 15,
+                    phase: Math.random() * Math.PI * 2
+                }));
+
+                this.generateTrees();
+            }
+
+            resize() {
+                this.width = window.innerWidth;
+                this.height = window.innerHeight;
+                this.canvas.width = this.width;
+                this.canvas.height = this.height;
+
+                // Reszponzív szán méret
+                this.player.width = Math.max(86, Math.min(125, this.width * 0.22));
+                this.player.height = this.player.width * 0.58;
+                this.player.y = this.height - this.player.height - Math.max(24, this.height * 0.04);
+
+                if (this.state === 'MENU') {
+                    this.player.x = this.width / 2;
+                } else {
+                    this.player.x = Math.max(this.player.width / 2, Math.min(this.width - this.player.width / 2, this.player.x));
+                }
+
+                this.generateTrees();
+            }
+
+            generateTrees() {
+                const count = Math.ceil(this.width / 85) + 2;
+                this.trees = [];
+                for (let i = 0; i < count; i++) {
+                    this.trees.push({
+                        x: (i * 85) -
